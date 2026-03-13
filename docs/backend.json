@@ -1,0 +1,42 @@
+
+{
+  "entities": {
+    "PatientToken": {
+      "title": "PatientToken",
+      "description": "A record of a patient's booking and token information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "mobile": { "type": "string" },
+        "place": { "type": "string" },
+        "healthIssue": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "tokenNumber": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "mobile", "doctorId", "tokenNumber"]
+    },
+    "DoctorStats": {
+      "title": "DoctorStats",
+      "description": "Live booking statistics for a doctor.",
+      "type": "object",
+      "properties": {
+        "booked": { "type": "integer" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["anonymous"]
+  },
+  "firestore": {
+    "/tokens/{tokenId}": {
+      "schema": "#/entities/PatientToken",
+      "description": "Collection of generated patient tokens."
+    },
+    "/doctorStats/{doctorId}": {
+      "schema": "#/entities/DoctorStats",
+      "description": "Collection of current token counts per doctor."
+    }
+  }
+}

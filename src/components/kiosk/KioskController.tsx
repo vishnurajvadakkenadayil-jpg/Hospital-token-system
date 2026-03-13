@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Header } from "./Header";
 import { TRANSLATIONS, MOCK_DOCTORS } from "@/lib/constants";
 import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
@@ -10,6 +11,18 @@ import { Numpad } from "./Numpad";
 import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  increment, 
+  runTransaction,
+  serverTimestamp 
+} from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
@@ -24,11 +37,38 @@ export function KioskController() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [tempVoiceText, setTempVoiceText] = useState("");
   const [timer, setTimer] = useState(15);
+  const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
+  const db = useFirestore();
   const t = TRANSLATIONS[lang];
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Sync Live Doctor Stats from Firestore
+  useEffect(() => {
+    if (!db) return;
+    
+    const unsub = onSnapshot(collection(db, "doctorStats"), (snapshot) => {
+      const stats = snapshot.docs.reduce((acc, d) => {
+        acc[d.id] = d.data().booked || 0;
+        return acc;
+      }, {} as Record<string, number>);
+
+      setLiveDoctors(prev => prev.map(doc => ({
+        ...doc,
+        booked: stats[doc.id] ?? 0
+      })));
+    }, async (err) => {
+      const permsError = new FirestorePermissionError({
+        path: "doctorStats",
+        operation: "list"
+      });
+      errorEmitter.emit("permission-error", permsError);
+    });
+
+    return () => unsub();
+  }, [db]);
 
   // Auto Reset Logic
   useEffect(() => {
@@ -78,14 +118,9 @@ export function KioskController() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
-      let mimeType = 'audio/webm';
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        mimeType = 'audio/webm;codecs=opus';
-      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-        mimeType = 'audio/ogg;codecs=opus';
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        mimeType = 'audio/mp4';
-      }
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : 'audio/webm';
         
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -102,11 +137,6 @@ export function KioskController() {
         }
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-        if (audioBlob.size < 500) { // Safety check for very short clicks
-          setIsProcessing(false);
-          return;
-        }
-
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -159,18 +189,64 @@ export function KioskController() {
     else if (currentField === 'healthIssue') setStep('DOCTOR_SELECT');
   };
 
-  const selectDoctor = (doc: Doctor) => {
-    const token = Math.floor(Math.random() * 90) + 10;
-    setPatientData(prev => ({ 
-      ...prev, 
-      doctorName: doc.name, 
-      tokenNumber: token,
-      timestamp: Date.now() 
-    }));
-    setStep('CONFIRMATION');
-    setTimeout(() => {
-      window.print();
-    }, 500);
+  const selectDoctor = async (doctor: Doctor) => {
+    if (!db) return;
+
+    try {
+      // Use a transaction to safely increment the token number
+      await runTransaction(db, async (transaction) => {
+        const statsRef = doc(db, "doctorStats", doctor.id);
+        const statsDoc = await transaction.get(statsRef);
+        
+        let newTokenNumber = 1;
+        if (statsDoc.exists()) {
+          newTokenNumber = (statsDoc.data().booked || 0) + 1;
+        }
+
+        if (newTokenNumber > doctor.limit) {
+          throw new Error("Doctor is fully booked");
+        }
+
+        // 1. Update doctor stats
+        transaction.set(statsRef, { booked: newTokenNumber }, { merge: true });
+
+        // 2. Save token record
+        const tokenRef = doc(collection(db, "tokens"));
+        const finalData = {
+          ...patientData,
+          doctorName: doctor.name,
+          doctorId: doctor.id,
+          tokenNumber: newTokenNumber,
+          timestamp: serverTimestamp(),
+        };
+        transaction.set(tokenRef, finalData);
+
+        // Update local UI state for confirmation screen
+        setPatientData(prev => ({ 
+          ...prev, 
+          doctorName: doctor.name, 
+          tokenNumber: newTokenNumber,
+          timestamp: Date.now() 
+        }));
+      });
+
+      setStep('CONFIRMATION');
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    } catch (err: any) {
+      console.error("Booking error:", err);
+      if (err.message === "Doctor is fully booked") {
+        alert(t.fullyBooked);
+      } else {
+        const permsError = new FirestorePermissionError({
+          path: "doctorStats",
+          operation: "update",
+          requestResourceData: { doctorId: doctor.id }
+        });
+        errorEmitter.emit("permission-error", permsError);
+      }
+    }
   };
 
   const renderContent = () => {
@@ -178,7 +254,7 @@ export function KioskController() {
       case 'LANGUAGE':
         return (
           <div className="flex flex-col items-center justify-center gap-12 h-full">
-            <h2 className="text-5xl font-bold text-foreground mb-4">Choose Your Language</h2>
+            <h2 className="text-5xl font-bold text-foreground mb-4">{t.selectLanguage}</h2>
             <div className="flex gap-8">
               <Button 
                 onClick={() => handleLangSelect('en')}
@@ -307,7 +383,7 @@ export function KioskController() {
              </div>
             <h2 className="text-3xl font-bold text-center mb-6">{t.selectDoctor}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {MOCK_DOCTORS.map((doc) => {
+              {liveDoctors.map((doc) => {
                 const isFull = doc.booked >= doc.limit;
                 return (
                   <Button

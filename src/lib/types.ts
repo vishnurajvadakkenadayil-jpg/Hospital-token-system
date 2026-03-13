@@ -7,8 +7,9 @@ export interface PatientData {
   place: string;
   healthIssue: string;
   doctorName?: string;
+  doctorId?: string;
   tokenNumber?: number;
-  timestamp?: number;
+  timestamp?: number | any; // Firestore serverTimestamp or Date.now()
 }
 
 export interface Doctor {
