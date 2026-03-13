@@ -8,7 +8,7 @@ import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
-import { Mic, Check, RotateCcw, ArrowRight } from "lucide-react";
+import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
 
@@ -24,10 +24,9 @@ export function KioskController() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tempVoiceText, setTempVoiceText] = useState("");
-  const [timer, setTimer] = useState(10);
+  const [timer, setTimer] = useState(15);
 
   const t = TRANSLATIONS[lang];
-  const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -39,7 +38,7 @@ export function KioskController() {
         setTimer((prev) => {
           if (prev <= 1) {
             resetKiosk();
-            return 10;
+            return 15;
           }
           return prev - 1;
         });
@@ -52,7 +51,16 @@ export function KioskController() {
     setStep('LANGUAGE');
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
-    setTimer(10);
+    setTimer(15);
+  };
+
+  const goBack = () => {
+    if (step === 'NAME') setStep('LANGUAGE');
+    else if (step === 'MOBILE') setStep('NAME');
+    else if (step === 'PLACE') setStep('MOBILE');
+    else if (step === 'HEALTH_ISSUE') setStep('PLACE');
+    else if (step === 'DOCTOR_SELECT') setStep('HEALTH_ISSUE');
+    setTempVoiceText("");
   };
 
   const handleLangSelect = (l: Language) => {
@@ -67,7 +75,13 @@ export function KioskController() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      
+      // Determine supported mime type
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : 'audio/webm';
+        
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -76,7 +90,12 @@ export function KioskController() {
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        if (chunksRef.current.length === 0) {
+          console.error("No audio data captured");
+          return;
+        }
+
+        const audioBlob = new Blob(chunksRef.current, { type: mimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -84,25 +103,31 @@ export function KioskController() {
           setIsProcessing(true);
           try {
             const result = await malayalamSpeechToText({ audioDataUri: base64Audio });
-            setTempVoiceText(result.recognizedText);
+            if (result && result.recognizedText) {
+              setTempVoiceText(result.recognizedText);
+            }
           } catch (err) {
-            console.error(err);
+            console.error("Transcription error:", err);
             alert(t.errorVoice);
           } finally {
             setIsProcessing(false);
           }
         };
+
+        // Stop all tracks to release the microphone
+        stream.getTracks().forEach(track => track.stop());
       };
 
       recorder.start();
       setIsRecording(true);
     } catch (err) {
       console.error("Mic access denied", err);
+      alert("Microphone access is required for voice input. Please check permissions.");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
@@ -170,7 +195,13 @@ export function KioskController() {
         const currentVal = patientData[field];
 
         return (
-          <div className="flex flex-col items-center gap-10 max-w-2xl mx-auto py-10">
+          <div className="flex flex-col items-center gap-10 max-w-2xl mx-auto py-10 w-full">
+             <div className="w-full flex justify-start">
+               <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
+                 <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
+               </Button>
+             </div>
+             
             <h2 className="text-4xl font-bold text-center">{t[field as keyof typeof t]}</h2>
             
             {lang === 'en' ? (
@@ -193,34 +224,39 @@ export function KioskController() {
             ) : (
               <div className="w-full flex flex-col items-center gap-8">
                 {isProcessing ? (
-                  <div className="animate-pulse text-2xl text-primary font-bold">{t.processing}</div>
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary"></div>
+                    <div className="text-2xl text-primary font-bold">{t.processing}</div>
+                  </div>
                 ) : tempVoiceText ? (
                   <div className="flex flex-col items-center gap-6 w-full">
-                    <div className="bg-white border-4 border-primary rounded-2xl p-8 w-full text-center text-3xl font-bold min-h-[120px]">
+                    <div className="bg-white border-4 border-primary rounded-2xl p-8 w-full text-center text-3xl font-bold min-h-[120px] shadow-sm">
                       {tempVoiceText}
                     </div>
                     <div className="flex gap-4 w-full">
-                      <Button variant="outline" className="flex-1 h-20 text-2xl" onClick={() => setTempVoiceText("")}>
+                      <Button variant="outline" className="flex-1 h-20 text-2xl border-2" onClick={() => setTempVoiceText("")}>
                         <RotateCcw className="mr-2" /> {t.speakAgain}
                       </Button>
-                      <Button className="flex-1 h-20 text-2xl bg-green-600 hover:bg-green-700" onClick={() => confirmVoiceInput(field)}>
+                      <Button className="flex-1 h-20 text-2xl bg-green-600 hover:bg-green-700 shadow-md" onClick={() => confirmVoiceInput(field)}>
                         <Check className="mr-2" /> {t.confirm}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <Button 
-                    className={`w-56 h-56 rounded-full shadow-2xl transition-all active:scale-90 ${isRecording ? 'bg-red-500 animate-bounce' : 'bg-primary'}`}
+                    className={`w-56 h-56 rounded-full shadow-2xl transition-all active:scale-95 ${isRecording ? 'bg-red-500 scale-110' : 'bg-primary'}`}
                     onMouseDown={startRecording}
                     onMouseUp={stopRecording}
                     onTouchStart={startRecording}
                     onTouchEnd={stopRecording}
                   >
-                    <Mic className="w-24 h-24 text-white" />
+                    <Mic className={`w-24 h-24 text-white ${isRecording ? 'animate-pulse' : ''}`} />
                   </Button>
                 )}
                 {!tempVoiceText && !isProcessing && (
-                  <p className="text-xl font-medium text-muted-foreground">{t.tapToSpeak}</p>
+                  <p className="text-2xl font-bold text-muted-foreground bg-primary/5 px-6 py-2 rounded-full border border-primary/10">
+                    {isRecording ? (lang === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...') : t.tapToSpeak}
+                  </p>
                 )}
               </div>
             )}
@@ -229,7 +265,12 @@ export function KioskController() {
 
       case 'MOBILE':
         return (
-          <div className="flex flex-col items-center gap-8 py-6 w-full">
+          <div className="flex flex-col items-center gap-6 py-6 w-full max-w-3xl mx-auto">
+             <div className="w-full flex justify-start px-4">
+               <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
+                 <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
+               </Button>
+             </div>
             <h2 className="text-4xl font-bold">{t.mobile}</h2>
             <Numpad 
               value={patientData.mobile} 
@@ -242,7 +283,12 @@ export function KioskController() {
 
       case 'DOCTOR_SELECT':
         return (
-          <div className="w-full max-w-5xl mx-auto py-10">
+          <div className="w-full max-w-5xl mx-auto py-10 px-4">
+            <div className="w-full flex justify-start mb-4">
+               <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
+                 <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
+               </Button>
+             </div>
             <h2 className="text-4xl font-bold text-center mb-10">{t.selectDoctor}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {MOCK_DOCTORS.map((doc) => {
@@ -253,7 +299,7 @@ export function KioskController() {
                     variant="outline"
                     disabled={isFull}
                     onClick={() => selectDoctor(doc)}
-                    className={`h-auto flex flex-col items-start p-6 text-left border-2 hover:border-primary transition-all relative ${isFull ? 'opacity-50 grayscale' : 'hover:bg-primary/5'}`}
+                    className={`h-auto flex flex-col items-start p-6 text-left border-2 hover:border-primary transition-all relative ${isFull ? 'opacity-50 grayscale' : 'hover:bg-primary/5 shadow-sm'}`}
                   >
                     <div className="flex justify-between w-full mb-2">
                       <h3 className="text-2xl font-bold text-foreground">{doc.name}</h3>
@@ -288,9 +334,12 @@ export function KioskController() {
                  {t.waitMessage}
                </p>
              </div>
-             <div className="mt-10 text-muted-foreground font-bold">
-               Returning to home in {timer} seconds...
+             <div className="mt-10 text-muted-foreground font-bold text-xl">
+               Restarting in {timer} seconds...
              </div>
+             <Button onClick={resetKiosk} size="lg" className="h-16 px-10 text-xl font-bold">
+               Done
+             </Button>
           </div>
         );
 
