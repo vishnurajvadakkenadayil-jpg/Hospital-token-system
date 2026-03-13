@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -76,7 +75,6 @@ export function KioskController() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Determine supported mime type
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
         ? 'audio/webm;codecs=opus' 
         : 'audio/webm';
@@ -90,10 +88,7 @@ export function KioskController() {
       };
 
       recorder.onstop = async () => {
-        if (chunksRef.current.length === 0) {
-          console.error("No audio data captured");
-          return;
-        }
+        if (chunksRef.current.length === 0) return;
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
         const reader = new FileReader();
@@ -114,7 +109,6 @@ export function KioskController() {
           }
         };
 
-        // Stop all tracks to release the microphone
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -122,7 +116,6 @@ export function KioskController() {
       setIsRecording(true);
     } catch (err) {
       console.error("Mic access denied", err);
-      alert("Microphone access is required for voice input. Please check permissions.");
     }
   };
 
@@ -195,7 +188,7 @@ export function KioskController() {
         const currentVal = patientData[field];
 
         return (
-          <div className="flex flex-col items-center gap-10 max-w-2xl mx-auto py-10 w-full">
+          <div className="flex flex-col items-center gap-6 max-w-2xl mx-auto py-6 w-full h-full">
              <div className="w-full flex justify-start">
                <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
                  <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
@@ -244,17 +237,17 @@ export function KioskController() {
                   </div>
                 ) : (
                   <Button 
-                    className={`w-56 h-56 rounded-full shadow-2xl transition-all active:scale-95 ${isRecording ? 'bg-red-500 scale-110' : 'bg-primary'}`}
+                    className={`w-48 h-48 rounded-full shadow-2xl transition-all active:scale-95 ${isRecording ? 'bg-red-500 scale-105' : 'bg-primary'}`}
                     onMouseDown={startRecording}
                     onMouseUp={stopRecording}
                     onTouchStart={startRecording}
                     onTouchEnd={stopRecording}
                   >
-                    <Mic className={`w-24 h-24 text-white ${isRecording ? 'animate-pulse' : ''}`} />
+                    <Mic className={`w-20 h-20 text-white ${isRecording ? 'animate-pulse' : ''}`} />
                   </Button>
                 )}
                 {!tempVoiceText && !isProcessing && (
-                  <p className="text-2xl font-bold text-muted-foreground bg-primary/5 px-6 py-2 rounded-full border border-primary/10">
+                  <p className="text-2xl font-bold text-muted-foreground">
                     {isRecording ? (lang === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...') : t.tapToSpeak}
                   </p>
                 )}
@@ -265,13 +258,13 @@ export function KioskController() {
 
       case 'MOBILE':
         return (
-          <div className="flex flex-col items-center gap-6 py-6 w-full max-w-3xl mx-auto">
+          <div className="flex flex-col items-center gap-2 py-2 w-full max-w-3xl mx-auto h-full">
              <div className="w-full flex justify-start px-4">
                <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
                  <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
                </Button>
              </div>
-            <h2 className="text-4xl font-bold">{t.mobile}</h2>
+            <h2 className="text-3xl font-bold">{t.mobile}</h2>
             <Numpad 
               value={patientData.mobile} 
               onChange={(val) => updateData('mobile', val)} 
@@ -283,14 +276,14 @@ export function KioskController() {
 
       case 'DOCTOR_SELECT':
         return (
-          <div className="w-full max-w-5xl mx-auto py-10 px-4">
-            <div className="w-full flex justify-start mb-4">
+          <div className="w-full max-w-5xl mx-auto py-6 px-4">
+            <div className="w-full flex justify-start mb-2">
                <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
                  <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
                </Button>
              </div>
-            <h2 className="text-4xl font-bold text-center mb-10">{t.selectDoctor}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h2 className="text-3xl font-bold text-center mb-6">{t.selectDoctor}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {MOCK_DOCTORS.map((doc) => {
                 const isFull = doc.booked >= doc.limit;
                 return (
@@ -299,18 +292,18 @@ export function KioskController() {
                     variant="outline"
                     disabled={isFull}
                     onClick={() => selectDoctor(doc)}
-                    className={`h-auto flex flex-col items-start p-6 text-left border-2 hover:border-primary transition-all relative ${isFull ? 'opacity-50 grayscale' : 'hover:bg-primary/5 shadow-sm'}`}
+                    className={`h-auto flex flex-col items-start p-4 text-left border-2 hover:border-primary transition-all relative ${isFull ? 'opacity-50 grayscale' : 'hover:bg-primary/5 shadow-sm'}`}
                   >
-                    <div className="flex justify-between w-full mb-2">
-                      <h3 className="text-2xl font-bold text-foreground">{doc.name}</h3>
-                      <span className="text-primary font-bold bg-primary/10 px-3 py-1 rounded-lg text-sm">{doc.specialty}</span>
+                    <div className="flex justify-between w-full mb-1">
+                      <h3 className="text-xl font-bold text-foreground">{doc.name}</h3>
+                      <span className="text-primary font-bold bg-primary/10 px-2 py-0.5 rounded text-xs">{doc.specialty}</span>
                     </div>
-                    <p className="text-muted-foreground text-lg mb-4">{doc.time}</p>
+                    <p className="text-muted-foreground text-sm mb-2">{doc.time}</p>
                     <div className="flex items-center justify-between w-full mt-auto">
-                      <span className="text-sm font-semibold">
+                      <span className="text-xs font-semibold">
                         {t.tokensBooked}: <span className={isFull ? 'text-destructive' : 'text-primary'}>{doc.booked} / {doc.limit}</span>
                       </span>
-                      {isFull && <span className="text-destructive font-black uppercase text-xl">{t.fullyBooked}</span>}
+                      {isFull && <span className="text-destructive font-black uppercase text-sm">{t.fullyBooked}</span>}
                     </div>
                   </Button>
                 );
@@ -321,23 +314,23 @@ export function KioskController() {
 
       case 'CONFIRMATION':
         return (
-          <div className="flex flex-col items-center justify-center gap-10 h-full py-20 animate-in fade-in zoom-in duration-500">
-             <div className="bg-white border-8 border-green-500 rounded-full p-10 shadow-2xl">
-               <Check className="w-32 h-32 text-green-500" />
+          <div className="flex flex-col items-center justify-center gap-10 h-full py-10 animate-in fade-in zoom-in duration-500">
+             <div className="bg-white border-8 border-green-500 rounded-full p-8 shadow-2xl">
+               <Check className="w-24 h-24 text-green-500" />
              </div>
-             <div className="text-center space-y-6">
-               <h2 className="text-4xl font-bold text-muted-foreground">{t.tokenMessage}</h2>
-               <div className="text-[12rem] font-black leading-none text-primary drop-shadow-lg">
+             <div className="text-center space-y-4">
+               <h2 className="text-3xl font-bold text-muted-foreground">{t.tokenMessage}</h2>
+               <div className="text-[10rem] font-black leading-none text-primary drop-shadow-lg">
                  {patientData.tokenNumber}
                </div>
-               <p className="text-3xl font-medium text-foreground max-w-xl mx-auto">
+               <p className="text-2xl font-medium text-foreground max-w-xl mx-auto">
                  {t.waitMessage}
                </p>
              </div>
-             <div className="mt-10 text-muted-foreground font-bold text-xl">
+             <div className="mt-4 text-muted-foreground font-bold text-lg">
                Restarting in {timer} seconds...
              </div>
-             <Button onClick={resetKiosk} size="lg" className="h-16 px-10 text-xl font-bold">
+             <Button onClick={resetKiosk} size="lg" className="h-14 px-8 text-lg font-bold">
                Done
              </Button>
           </div>
@@ -349,9 +342,9 @@ export function KioskController() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header lang={lang} />
-      <main className="flex-1 overflow-y-auto px-6 no-print flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto px-4 no-print flex flex-col items-center">
         {renderContent()}
       </main>
       <ReceiptTemplate data={patientData} />
