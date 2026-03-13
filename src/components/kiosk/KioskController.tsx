@@ -122,7 +122,7 @@ export function KioskController() {
   };
 
   const selectDoctor = (doc: Doctor) => {
-    const token = Math.floor(Math.random() * 90) + 10; // Simulation: in real app, fetch sequential from DB
+    const token = Math.floor(Math.random() * 90) + 10;
     setPatientData(prev => ({ 
       ...prev, 
       doctorName: doc.name, 
@@ -130,7 +130,6 @@ export function KioskController() {
       timestamp: Date.now() 
     }));
     setStep('CONFIRMATION');
-    // Simulate Print
     setTimeout(() => {
       window.print();
     }, 500);
@@ -230,7 +229,7 @@ export function KioskController() {
 
       case 'MOBILE':
         return (
-          <div className="flex flex-col items-center gap-10 py-10">
+          <div className="flex flex-col items-center gap-8 py-6 w-full">
             <h2 className="text-4xl font-bold">{t.mobile}</h2>
             <Numpad 
               value={patientData.mobile} 
@@ -301,9 +300,9 @@ export function KioskController() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header lang={lang} />
-      <main className="flex-1 overflow-y-auto px-6 no-print">
+      <main className="flex-1 overflow-y-auto px-6 no-print flex flex-col items-center">
         {renderContent()}
       </main>
       <ReceiptTemplate data={patientData} />
