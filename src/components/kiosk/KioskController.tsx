@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -79,7 +78,6 @@ export function KioskController() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
-      // Determine supported MIME type
       let mimeType = 'audio/webm';
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
         mimeType = 'audio/webm;codecs=opus';
@@ -104,7 +102,7 @@ export function KioskController() {
         }
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-        if (audioBlob.size < 1000) { // Too small to be a real recording
+        if (audioBlob.size < 500) { // Safety check for very short clicks
           setIsProcessing(false);
           return;
         }
@@ -127,7 +125,6 @@ export function KioskController() {
           }
         };
 
-        // Stop all tracks to release mic
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
@@ -137,8 +134,8 @@ export function KioskController() {
       recorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error("Mic access denied", err);
-      alert(lang === 'en' ? "Microphone access denied. Please enable it in your browser settings." : "മൈക്രോഫോൺ അനുമതി നിഷേധിച്ചു. ദയവായി ബ്രൗസർ ക്രമീകരണങ്ങളിൽ ഇത് പ്രവർത്തനക്ഷമമാക്കുക.");
+      console.error("Mic access error", err);
+      alert(lang === 'en' ? "Could not access microphone." : "മൈക്രോഫോൺ ലഭ്യമാക്കാൻ കഴിഞ്ഞില്ല.");
     }
   };
 
@@ -240,39 +237,42 @@ export function KioskController() {
             ) : (
               <div className="w-full flex flex-col items-center gap-8">
                 {isProcessing ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary"></div>
-                    <div className="text-2xl text-primary font-bold">{t.processing}</div>
+                  <div className="flex flex-col items-center gap-6 p-10 bg-white rounded-3xl border-4 border-dashed border-primary animate-pulse">
+                    <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-primary"></div>
+                    <div className="text-3xl text-primary font-black uppercase tracking-widest">{t.processing}</div>
                   </div>
                 ) : tempVoiceText ? (
                   <div className="flex flex-col items-center gap-6 w-full">
-                    <div className="bg-white border-4 border-primary rounded-2xl p-8 w-full text-center text-3xl font-bold min-h-[120px] shadow-sm">
+                    <div className="bg-white border-4 border-primary rounded-2xl p-8 w-full text-center text-4xl font-bold min-h-[140px] shadow-lg flex items-center justify-center">
                       {tempVoiceText}
                     </div>
                     <div className="flex gap-4 w-full">
-                      <Button variant="outline" className="flex-1 h-20 text-2xl border-2" onClick={() => setTempVoiceText("")}>
+                      <Button variant="outline" className="flex-1 h-24 text-2xl border-2" onClick={() => setTempVoiceText("")}>
                         <RotateCcw className="mr-2" /> {t.speakAgain}
                       </Button>
-                      <Button className="flex-1 h-20 text-2xl bg-green-600 hover:bg-green-700 shadow-md" onClick={() => confirmVoiceInput(field)}>
+                      <Button className="flex-1 h-24 text-2xl bg-green-600 hover:bg-green-700 shadow-md" onClick={() => confirmVoiceInput(field)}>
                         <Check className="mr-2" /> {t.confirm}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <Button 
-                    className={`w-48 h-48 rounded-full shadow-2xl transition-all active:scale-95 ${isRecording ? 'bg-red-500 scale-105' : 'bg-primary'}`}
-                    onMouseDown={startRecording}
-                    onMouseUp={stopRecording}
-                    onTouchStart={startRecording}
-                    onTouchEnd={stopRecording}
-                  >
-                    <Mic className={`w-20 h-20 text-white ${isRecording ? 'animate-pulse' : ''}`} />
-                  </Button>
-                )}
-                {!tempVoiceText && !isProcessing && (
-                  <p className="text-2xl font-bold text-muted-foreground">
-                    {isRecording ? (lang === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...') : t.tapToSpeak}
-                  </p>
+                  <div className="flex flex-col items-center gap-10">
+                    <Button 
+                      className={`w-64 h-64 rounded-full shadow-2xl transition-all active:scale-90 ${isRecording ? 'bg-red-500 scale-110 ring-8 ring-red-200' : 'bg-primary hover:bg-primary/90'}`}
+                      onMouseDown={startRecording}
+                      onMouseUp={stopRecording}
+                      onTouchStart={startRecording}
+                      onTouchEnd={stopRecording}
+                    >
+                      <Mic className={`w-32 h-32 text-white ${isRecording ? 'animate-pulse' : ''}`} />
+                    </Button>
+                    <div className="text-center space-y-2">
+                      <p className="text-3xl font-black text-foreground">
+                        {isRecording ? (lang === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...') : t.tapToSpeak}
+                      </p>
+                      {!isRecording && <p className="text-xl text-muted-foreground font-bold">(Hold to talk)</p>}
+                    </div>
+                  </div>
                 )}
               </div>
             )}

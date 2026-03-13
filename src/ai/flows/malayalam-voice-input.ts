@@ -34,8 +34,8 @@ const malayalamSpeechToTextPrompt = ai.definePrompt({
   name: 'malayalamSpeechToTextPrompt',
   input: {schema: MalayalamSpeechToTextInputSchema},
   output: {schema: MalayalamSpeechToTextOutputSchema},
-  model: 'googleai/gemini-1.5-flash',
-  prompt: `You are an expert at transcribing Malayalam audio into text. Transcribe the audio provided. Ensure the output is only the transcribed text, without any additional commentary or formatting.
+  prompt: `You are an expert at transcribing Malayalam audio. Listen to the provided audio and transcribe it exactly as spoken into Malayalam text. 
+Ensure the output is ONLY the transcribed Malayalam text, without any additional commentary, formatting, or translation.
 Language: Malayalam
 {{media url=audioDataUri}}`,
 });
