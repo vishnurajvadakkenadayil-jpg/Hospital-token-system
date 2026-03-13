@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
-import { useFirestore, useAuth } from "@/firebase";
+import { useFirestore, useAuth, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -45,25 +45,28 @@ export function KioskController() {
 
   const db = useFirestore();
   const auth = useAuth();
+  const { user } = useUser();
   const t = TRANSLATIONS[lang];
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Auto Sign-in Anonymously to ensure user has permission to write to Firestore
   useEffect(() => {
-    if (auth) {
+    if (auth && !user) {
       signInAnonymously(auth).catch((err) => {
         console.error("Anonymous sign-in failed", err);
       });
     }
-  }, [auth]);
+  }, [auth, user]);
 
   // Sync Live Doctor Stats from Firestore
   useEffect(() => {
     if (!db) return;
     
-    const unsub = onSnapshot(collection(db, "doctorStats"), (snapshot) => {
+    const statsQuery = collection(db, "doctorStats");
+    const unsub = onSnapshot(statsQuery, (snapshot) => {
       const stats = snapshot.docs.reduce((acc, d) => {
         acc[d.id] = d.data().booked || 0;
         return acc;
@@ -132,9 +135,8 @@ export function KioskController() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
+      const formats = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      const mimeType = formats.find(f => MediaRecorder.isTypeSupported(f)) || 'audio/webm';
         
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -163,7 +165,6 @@ export function KioskController() {
             }
           } catch (err) {
             console.error("Transcription error:", err);
-            alert(t.errorVoice);
           } finally {
             setIsProcessing(false);
           }
@@ -179,7 +180,6 @@ export function KioskController() {
       setIsRecording(true);
     } catch (err) {
       console.error("Mic access error", err);
-      alert(lang === 'en' ? "Could not access microphone." : "മൈക്രോഫോൺ ലഭ്യമാക്കാൻ കഴിഞ്ഞില്ല.");
     }
   };
 
@@ -204,10 +204,12 @@ export function KioskController() {
   };
 
   const selectDoctor = async (doctor: Doctor) => {
-    if (!db) return;
+    if (!db || !user) {
+      alert(lang === 'en' ? "Initializing session... please try again in a moment." : "സെഷൻ ആരംഭിക്കുന്നു... ദയവായി അല്പസമയത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.");
+      return;
+    }
 
     try {
-      // Use a transaction to safely increment the token number
       await runTransaction(db, async (transaction) => {
         const statsRef = doc(db, "doctorStats", doctor.id);
         const statsDoc = await transaction.get(statsRef);
@@ -221,10 +223,8 @@ export function KioskController() {
           throw new Error("Doctor is fully booked");
         }
 
-        // 1. Update doctor stats
         transaction.set(statsRef, { booked: newTokenNumber }, { merge: true });
 
-        // 2. Save token record
         const tokenRef = doc(collection(db, "tokens"));
         const finalData = {
           ...patientData,
@@ -235,7 +235,6 @@ export function KioskController() {
         };
         transaction.set(tokenRef, finalData);
 
-        // Update local UI state for confirmation screen
         setPatientData(prev => ({ 
           ...prev, 
           doctorName: doctor.name, 
@@ -254,9 +253,9 @@ export function KioskController() {
         alert(t.fullyBooked);
       } else {
         const permsError = new FirestorePermissionError({
-          path: "doctorStats",
-          operation: "update",
-          requestResourceData: { doctorId: doctor.id }
+          path: `doctorStats/${doctor.id}`,
+          operation: 'write',
+          requestResourceData: { booked: 'increment' },
         });
         errorEmitter.emit("permission-error", permsError);
       }
