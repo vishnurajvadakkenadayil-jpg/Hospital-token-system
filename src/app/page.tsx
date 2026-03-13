@@ -1,3 +1,10 @@
+
+import { KioskController } from "@/components/kiosk/KioskController";
+
 export default function Home() {
-  return <></>;
+  return (
+    <div className="h-screen w-full">
+      <KioskController />
+    </div>
+  );
 }

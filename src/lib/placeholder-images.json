@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hospital-logo",
+      "description": "Medical cross hospital logo",
+      "imageUrl": "https://picsum.photos/seed/hospital/100/100",
+      "imageHint": "medical cross"
+    }
+  ]
 }
