@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "./Header";
 import { TRANSLATIONS, MOCK_DOCTORS } from "@/lib/constants";
 import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
@@ -14,16 +14,20 @@ import { ReceiptTemplate } from "./ReceiptTemplate";
 import { 
   collection, 
   doc, 
-  setDoc, 
   onSnapshot, 
-  increment, 
   runTransaction,
   serverTimestamp 
 } from "firebase/firestore";
-import { useFirestore } from "@/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { useFirestore, useAuth } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
+/**
+ * KioskController handles the multi-step patient registration process.
+ * It uses Firebase Authentication for secure Firestore access and 
+ * Firestore transactions for atomic token generation.
+ */
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
   const [lang, setLang] = useState<Language>('en');
@@ -40,10 +44,20 @@ export function KioskController() {
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
+  const auth = useAuth();
   const t = TRANSLATIONS[lang];
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Auto Sign-in Anonymously to ensure user has permission to write to Firestore
+  useEffect(() => {
+    if (auth) {
+      signInAnonymously(auth).catch((err) => {
+        console.error("Anonymous sign-in failed", err);
+      });
+    }
+  }, [auth]);
 
   // Sync Live Doctor Stats from Firestore
   useEffect(() => {
