@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -28,6 +29,7 @@ export function KioskController() {
   const t = TRANSLATIONS[lang];
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Auto Reset Logic
   useEffect(() => {
@@ -51,6 +53,7 @@ export function KioskController() {
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
     setTimer(15);
+    stopRecording();
   };
 
   const goBack = () => {
@@ -74,10 +77,17 @@ export function KioskController() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
+      // Determine supported MIME type
+      let mimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        mimeType = 'audio/ogg;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      }
         
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -88,9 +98,17 @@ export function KioskController() {
       };
 
       recorder.onstop = async () => {
-        if (chunksRef.current.length === 0) return;
+        if (chunksRef.current.length === 0) {
+          setIsProcessing(false);
+          return;
+        }
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+        if (audioBlob.size < 1000) { // Too small to be a real recording
+          setIsProcessing(false);
+          return;
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -109,21 +127,26 @@ export function KioskController() {
           }
         };
 
-        stream.getTracks().forEach(track => track.stop());
+        // Stop all tracks to release mic
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
       };
 
       recorder.start();
       setIsRecording(true);
     } catch (err) {
       console.error("Mic access denied", err);
+      alert(lang === 'en' ? "Microphone access denied. Please enable it in your browser settings." : "മൈക്രോഫോൺ അനുമതി നിഷേധിച്ചു. ദയവായി ബ്രൗസർ ക്രമീകരണങ്ങളിൽ ഇത് പ്രവർത്തനക്ഷമമാക്കുക.");
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
+    setIsRecording(false);
   };
 
   const confirmVoiceInput = (field: keyof PatientData) => {
