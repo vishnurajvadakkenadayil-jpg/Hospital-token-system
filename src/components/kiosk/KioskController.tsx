@@ -8,7 +8,7 @@ import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
-import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
+import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
 import { 
@@ -36,16 +36,10 @@ export function KioskController() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooking, setIsBooking] = useState<string | null>(null);
   const [tempVoiceText, setTempVoiceText] = useState("");
-  const [timer, setTimer] = useState(15);
+  const [timer, setTimer] = useState(30); // Increased timer for print phase
   
-  // Manage doctor stats locally for instant feedback and to avoid DB permission issues
-  const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(() => {
-    // Optionally add some random initial bookings as requested
-    return MOCK_DOCTORS.map(d => ({
-      ...d,
-      booked: Math.floor(Math.random() * 3) // Start with 0-2 random bookings
-    }));
-  });
+  // Manage doctor stats locally for instant feedback
+  const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
   const auth = useAuth();
@@ -56,11 +50,11 @@ export function KioskController() {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Auto Sign-in Anonymously
+  // Auto Sign-in Anonymously for Firebase permission context
   useEffect(() => {
     if (auth && !user) {
       signInAnonymously(auth).catch((err) => {
-        console.error("Anonymous sign-in failed", err);
+        // Silent catch, user can still proceed locally
       });
     }
   }, [auth, user]);
@@ -73,7 +67,7 @@ export function KioskController() {
         setTimer((prev) => {
           if (prev <= 1) {
             resetKiosk();
-            return 15;
+            return 30;
           }
           return prev - 1;
         });
@@ -86,7 +80,7 @@ export function KioskController() {
     setStep('LANGUAGE');
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
-    setTimer(15);
+    setTimer(30);
     setIsBooking(null);
     stopRecording();
   };
@@ -182,18 +176,22 @@ export function KioskController() {
     else if (currentField === 'healthIssue') setStep('DOCTOR_SELECT');
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   const selectDoctor = (doctor: Doctor) => {
     setIsBooking(doctor.id);
 
-    // 1. Calculate new token number locally
+    // 1. Calculate new token number locally (starts at 1)
     const newTokenNumber = (doctor.booked || 0) + 1;
 
-    // 2. Update local state immediately for the next person
+    // 2. Update local state immediately
     setLiveDoctors(prev => prev.map(d => 
       d.id === doctor.id ? { ...d, booked: newTokenNumber } : d
     ));
 
-    // 3. Update patient data for the receipt
+    // 3. Update patient data
     const finalPatientData = {
       ...patientData,
       doctorName: doctor.name,
@@ -203,20 +201,16 @@ export function KioskController() {
     };
     setPatientData(finalPatientData);
 
-    // 4. Save record to Firestore in the background (silent fail if no permissions)
+    // 4. Background save to Firestore
     if (db) {
       addDoc(collection(db, "tokens"), {
         ...finalPatientData,
         timestamp: serverTimestamp(),
-      }).catch(err => console.error("Could not save backup record:", err));
+      }).catch(() => {}); // Silent catch for local-first reliability
     }
 
     // 5. Move to confirmation
     setStep('CONFIRMATION');
-    setTimeout(() => {
-      window.print();
-    }, 500);
-    
     setIsBooking(null);
   };
 
@@ -391,11 +385,11 @@ export function KioskController() {
 
       case 'CONFIRMATION':
         return (
-          <div className="flex flex-col items-center justify-center gap-10 h-full py-10 animate-in fade-in zoom-in duration-500">
-             <div className="bg-white border-8 border-green-500 rounded-full p-8 shadow-2xl">
-               <Check className="w-24 h-24 text-green-500" />
+          <div className="flex flex-col items-center justify-center gap-8 h-full py-10 animate-in fade-in zoom-in duration-500">
+             <div className="bg-white border-8 border-green-500 rounded-full p-6 shadow-2xl">
+               <Check className="w-20 h-20 text-green-500" />
              </div>
-             <div className="text-center space-y-4">
+             <div className="text-center space-y-2">
                <h2 className="text-3xl font-bold text-muted-foreground">{t.tokenMessage}</h2>
                <div className="text-[10rem] font-black leading-none text-primary drop-shadow-lg">
                  {patientData.tokenNumber}
@@ -404,12 +398,24 @@ export function KioskController() {
                  {t.waitMessage}
                </p>
              </div>
-             <div className="mt-4 text-muted-foreground font-bold text-lg">
+             
+             <div className="flex flex-col gap-4 w-full max-w-md">
+               <Button 
+                onClick={handlePrint} 
+                size="lg" 
+                className="h-24 px-8 text-3xl font-black bg-green-600 hover:bg-green-700 shadow-xl flex gap-4 uppercase"
+               >
+                 <Printer className="w-10 h-10" /> {lang === 'en' ? 'Print Receipt' : 'റസീപ്റ്റ് പ്രിന്റ് ചെയ്യുക'}
+               </Button>
+               
+               <Button onClick={resetKiosk} variant="ghost" className="h-14 text-xl font-bold text-muted-foreground">
+                 Done / ശരി
+               </Button>
+             </div>
+
+             <div className="mt-4 text-muted-foreground font-bold">
                Restarting in {timer} seconds...
              </div>
-             <Button onClick={resetKiosk} size="lg" className="h-14 px-8 text-lg font-bold">
-               Done
-             </Button>
           </div>
         );
 
