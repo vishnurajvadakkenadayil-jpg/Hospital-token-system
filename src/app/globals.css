@@ -36,6 +36,7 @@
   }
 }
 
+/* Printing logic: Hide kiosk UI, show A4 receipt */
 @media print {
   body {
     background: white !important;

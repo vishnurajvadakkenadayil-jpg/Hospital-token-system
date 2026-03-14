@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -21,9 +20,6 @@ import { useFirestore, useAuth, useUser } from "@/firebase";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -43,6 +39,7 @@ export function KioskController() {
   const [timer, setTimer] = useState(60); 
   const [showReceipt, setShowReceipt] = useState(false);
   
+  // Local state for live doctor counts to ensure responsiveness
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
@@ -54,12 +51,16 @@ export function KioskController() {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Auto-sign in for Firestore permissions
   useEffect(() => {
     if (auth && !user) {
-      signInAnonymously(auth).catch(() => {});
+      signInAnonymously(auth).catch((err) => {
+        console.error("Auth error:", err);
+      });
     }
   }, [auth, user]);
 
+  // Reset timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === 'CONFIRMATION' && !showReceipt) {
@@ -177,17 +178,19 @@ export function KioskController() {
     else if (currentField === 'healthIssue') setStep('DOCTOR_SELECT');
   };
 
-  const handlePrint = () => {
+  const handlePrintClick = () => {
     setShowReceipt(true);
+    // Auto-trigger print after short delay to allow dialog rendering
     setTimeout(() => {
       window.print();
-    }, 500);
+    }, 700);
   };
 
   const selectDoctor = (doctor: Doctor) => {
     setIsBooking(doctor.id);
     const newTokenNumber = (doctor.booked || 0) + 1;
 
+    // Update local UI immediately
     setLiveDoctors(prev => prev.map(d => 
       d.id === doctor.id ? { ...d, booked: newTokenNumber } : d
     ));
@@ -201,11 +204,12 @@ export function KioskController() {
     };
     setPatientData(finalPatientData);
 
+    // Save record to database
     if (db) {
       addDoc(collection(db, "tokens"), {
         ...finalPatientData,
         timestamp: serverTimestamp(),
-      }).catch(() => {});
+      }).catch(err => console.error("Firestore save error:", err));
     }
 
     setStep('CONFIRMATION');
@@ -395,7 +399,7 @@ export function KioskController() {
              
              <div className="flex flex-col gap-4 w-full max-w-md">
                <Button 
-                onClick={handlePrint} 
+                onClick={handlePrintClick} 
                 size="lg" 
                 className="h-32 px-8 text-4xl font-black bg-primary hover:bg-primary/90 shadow-xl flex gap-4 uppercase rounded-3xl"
                >
@@ -413,6 +417,7 @@ export function KioskController() {
                </div>
              )}
 
+             {/* A4 Prescription Popup Dialog */}
              <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
                <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[90vh] p-0 border-none bg-white overflow-hidden shadow-2xl rounded-2xl">
                  <div className="flex flex-col h-full bg-gray-100">
@@ -422,11 +427,13 @@ export function KioskController() {
                         <X className="w-6 h-6" />
                       </Button>
                     </div>
+                    
                     <ScrollArea className="flex-1 p-4 md:p-10">
-                      <div className="max-w-[210mm] mx-auto bg-white shadow-lg">
+                      <div className="max-w-[210mm] mx-auto bg-white shadow-lg overflow-hidden">
                         <ReceiptTemplate data={patientData} isPreview={true} />
                       </div>
                     </ScrollArea>
+                    
                     <div className="bg-white border-t p-6 flex gap-4 no-print">
                       <Button 
                         onClick={() => window.print()}
@@ -459,7 +466,7 @@ export function KioskController() {
       <main className="flex-1 overflow-y-auto px-4 no-print flex flex-col items-center">
         {renderContent()}
       </main>
-      {/* Real print-only version used by window.print() */}
+      {/* Real print-only version used by browser for A4 paper */}
       <ReceiptTemplate data={patientData} />
     </div>
   );

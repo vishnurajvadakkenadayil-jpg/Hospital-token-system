@@ -1,4 +1,3 @@
-
 export type Language = 'en' | 'ml';
 
 export interface PatientData {
@@ -9,7 +8,7 @@ export interface PatientData {
   doctorName?: string;
   doctorId?: string;
   tokenNumber?: number;
-  timestamp?: number | any; // Firestore serverTimestamp or Date.now()
+  timestamp?: number | any;
 }
 
 export interface Doctor {

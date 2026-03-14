@@ -1,4 +1,3 @@
-
 "use client";
 
 import { PatientData } from "@/lib/types";
@@ -6,11 +5,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * ReceiptTemplate formats the patient token as an A4 prescription pad.
+ * Optimized for both UI preview and physical A4 printing.
+ * 
  * Layout: 
  * - Clinic & Doctor Info: Top Left
  * - Token Number: Top Right
  * - Patient Details: Below Header
- * - Prescription Area: Large blank space (more than half the page)
+ * - Prescription Area: Large blank space (Rx area)
+ * - Footer: Signature space
  */
 export function ReceiptTemplate({ data, isPreview = false }: { data: PatientData, isPreview?: boolean }) {
   if (!data || !data.tokenNumber) return null;
@@ -56,10 +58,10 @@ export function ReceiptTemplate({ data, isPreview = false }: { data: PatientData
         </div>
       </div>
 
-      {/* Prescription / Notes Area (Blank Space) */}
+      {/* Prescription / Notes Area (Large Blank Space) */}
       <div className="flex-1 flex flex-col border-2 border-dashed border-gray-100 rounded-lg p-4">
         <div className="text-2xl font-black text-gray-200 italic mb-4">Rx / Notes</div>
-        {/* This div provides the large blank space for writing */}
+        {/* This div provides the large blank space for writing (approx 18cm) */}
         <div className="min-h-[18cm] w-full"></div>
       </div>
 

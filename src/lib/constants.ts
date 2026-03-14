@@ -1,4 +1,3 @@
-
 import { Doctor } from './types';
 
 export const TRANSLATIONS = {
@@ -42,11 +41,11 @@ export const TRANSLATIONS = {
   }
 };
 
-// Doctors start with 0 bookings as requested, or small random numbers to look "live"
+// Default doctor list with all bookings starting at 0 for the session
 export const MOCK_DOCTORS: Doctor[] = [
-  { id: '1', name: 'Dr. Rahul Sharma', specialty: 'General Physician', time: '09:00 AM - 01:00 PM', booked: 0, limit: 20 },
-  { id: '2', name: 'Dr. Priya Nair', specialty: 'Pediatrician', time: '10:00 AM - 02:00 PM', booked: 0, limit: 20 },
+  { id: '1', name: 'Dr. Rahul Sharma', specialty: 'General Physician', time: '09:00 AM - 01:00 PM', booked: 0, limit: 30 },
+  { id: '2', name: 'Dr. Priya Nair', specialty: 'Pediatrician', time: '10:00 AM - 02:00 PM', booked: 0, limit: 25 },
   { id: '3', name: 'Dr. Thomas Kurian', specialty: 'Cardiologist', time: '04:00 PM - 08:00 PM', booked: 0, limit: 15 },
-  { id: '4', name: 'Dr. Anjali Menon', specialty: 'Dermatologist', time: '11:00 AM - 03:00 PM', booked: 0, limit: 15 },
-  { id: '5', name: 'Dr. Sreedhar K.', specialty: 'Orthopedic', time: '05:00 PM - 09:00 PM', booked: 0, limit: 20 },
+  { id: '4', name: 'Dr. Anjali Menon', specialty: 'Dermatologist', time: '11:00 AM - 03:00 PM', booked: 0, limit: 20 },
+  { id: '5', name: 'Dr. Sreedhar K.', specialty: 'Orthopedic', time: '05:00 PM - 09:00 PM', booked: 0, limit: 30 },
 ];
