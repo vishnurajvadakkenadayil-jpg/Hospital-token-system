@@ -32,16 +32,22 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body overflow-hidden select-none;
+    @apply bg-background text-foreground font-body select-none;
   }
 }
 
 @media print {
+  body {
+    background: white !important;
+    overflow: visible !important;
+  }
   .no-print {
     display: none !important;
   }
   .print-only {
     display: block !important;
+    position: relative !important;
+    width: 100% !important;
   }
 }
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -19,10 +18,6 @@ import {
 import { signInAnonymously } from "firebase/auth";
 import { useFirestore, useAuth, useUser } from "@/firebase";
 
-/**
- * KioskController handles the multi-step patient registration process.
- * Manages doctor booking counts locally to ensure high performance and reliability.
- */
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
   const [lang, setLang] = useState<Language>('en');
@@ -36,9 +31,8 @@ export function KioskController() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooking, setIsBooking] = useState<string | null>(null);
   const [tempVoiceText, setTempVoiceText] = useState("");
-  const [timer, setTimer] = useState(30); // Increased timer for print phase
+  const [timer, setTimer] = useState(30); 
   
-  // Manage doctor stats locally for instant feedback
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
@@ -50,16 +44,12 @@ export function KioskController() {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Auto Sign-in Anonymously for Firebase permission context
   useEffect(() => {
     if (auth && !user) {
-      signInAnonymously(auth).catch((err) => {
-        // Silent catch, user can still proceed locally
-      });
+      signInAnonymously(auth).catch(() => {});
     }
   }, [auth, user]);
 
-  // Auto Reset Logic for Confirmation screen
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === 'CONFIRMATION') {
@@ -182,16 +172,12 @@ export function KioskController() {
 
   const selectDoctor = (doctor: Doctor) => {
     setIsBooking(doctor.id);
-
-    // 1. Calculate new token number locally (starts at 1)
     const newTokenNumber = (doctor.booked || 0) + 1;
 
-    // 2. Update local state immediately
     setLiveDoctors(prev => prev.map(d => 
       d.id === doctor.id ? { ...d, booked: newTokenNumber } : d
     ));
 
-    // 3. Update patient data
     const finalPatientData = {
       ...patientData,
       doctorName: doctor.name,
@@ -201,15 +187,13 @@ export function KioskController() {
     };
     setPatientData(finalPatientData);
 
-    // 4. Background save to Firestore
     if (db) {
       addDoc(collection(db, "tokens"), {
         ...finalPatientData,
         timestamp: serverTimestamp(),
-      }).catch(() => {}); // Silent catch for local-first reliability
+      }).catch(() => {});
     }
 
-    // 5. Move to confirmation
     setStep('CONFIRMATION');
     setIsBooking(null);
   };
@@ -425,7 +409,7 @@ export function KioskController() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-screen flex flex-col bg-background">
       <Header lang={lang} />
       <main className="flex-1 overflow-y-auto px-4 no-print flex flex-col items-center">
         {renderContent()}
