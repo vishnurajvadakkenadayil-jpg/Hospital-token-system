@@ -39,7 +39,7 @@ export function KioskController() {
   const [timer, setTimer] = useState(60); 
   const [showReceipt, setShowReceipt] = useState(false);
   
-  // Local state for live doctor counts to ensure responsiveness
+  // Local state for live doctor counts
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
@@ -59,6 +59,16 @@ export function KioskController() {
       });
     }
   }, [auth, user]);
+
+  // Randomize initial counts on client-side mount only
+  useEffect(() => {
+    const randomized = MOCK_DOCTORS.map(doc => ({
+      ...doc,
+      // Randomly fill between 0 and 70% of the doctor's limit
+      booked: Math.floor(Math.random() * (doc.limit * 0.7))
+    }));
+    setLiveDoctors(randomized);
+  }, []);
 
   // Reset timer logic
   useEffect(() => {
