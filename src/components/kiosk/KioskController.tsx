@@ -8,7 +8,7 @@ import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
-import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft } from "lucide-react";
+import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
 import { 
@@ -39,6 +39,7 @@ export function KioskController() {
   });
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isBooking, setIsBooking] = useState<string | null>(null);
   const [tempVoiceText, setTempVoiceText] = useState("");
   const [timer, setTimer] = useState(15);
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
@@ -46,13 +47,13 @@ export function KioskController() {
   const db = useFirestore();
   const auth = useAuth();
   const { user } = useUser();
-  const t = TRANSLATIONS[lang];
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Auto Sign-in Anonymously to ensure user has permission to write to Firestore
+  // Auto Sign-in Anonymously
   useEffect(() => {
     if (auth && !user) {
       signInAnonymously(auth).catch((err) => {
@@ -87,7 +88,7 @@ export function KioskController() {
     return () => unsub();
   }, [db]);
 
-  // Auto Reset Logic
+  // Auto Reset Logic for Confirmation screen
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === 'CONFIRMATION') {
@@ -109,6 +110,7 @@ export function KioskController() {
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
     setTimer(15);
+    setIsBooking(null);
     stopRecording();
   };
 
@@ -205,19 +207,23 @@ export function KioskController() {
 
   const selectDoctor = async (doctor: Doctor) => {
     if (!db || !user) {
-      alert(lang === 'en' ? "Initializing session... please try again in a moment." : "സെഷൻ ആരംഭിക്കുന്നു... ദയവായി അല്പസമയത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.");
+      alert(lang === 'en' ? "Session initializing... please wait." : "സെഷൻ ആരംഭിക്കുന്നു... ദയവായി അല്പസമയം കാത്തിരിക്കുക.");
       return;
     }
+
+    setIsBooking(doctor.id);
 
     try {
       await runTransaction(db, async (transaction) => {
         const statsRef = doc(db, "doctorStats", doctor.id);
         const statsDoc = await transaction.get(statsRef);
         
-        let newTokenNumber = 1;
+        let currentBooked = 0;
         if (statsDoc.exists()) {
-          newTokenNumber = (statsDoc.data().booked || 0) + 1;
+          currentBooked = statsDoc.data().booked || 0;
         }
+
+        const newTokenNumber = currentBooked + 1;
 
         if (newTokenNumber > doctor.limit) {
           throw new Error("Doctor is fully booked");
@@ -259,6 +265,8 @@ export function KioskController() {
         });
         errorEmitter.emit("permission-error", permsError);
       }
+    } finally {
+      setIsBooking(null);
     }
   };
 
@@ -327,7 +335,7 @@ export function KioskController() {
               <div className="w-full flex flex-col items-center gap-8">
                 {isProcessing ? (
                   <div className="flex flex-col items-center gap-6 p-10 bg-white rounded-3xl border-4 border-dashed border-primary animate-pulse">
-                    <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-primary"></div>
+                    <Loader2 className="h-20 w-20 text-primary animate-spin" />
                     <div className="text-3xl text-primary font-black uppercase tracking-widest">{t.processing}</div>
                   </div>
                 ) : tempVoiceText ? (
@@ -397,15 +405,22 @@ export function KioskController() {
             <h2 className="text-3xl font-bold text-center mb-6">{t.selectDoctor}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {liveDoctors.map((doc) => {
-                const isFull = doc.booked >= doc.limit;
+                const isFull = (doc.booked || 0) >= doc.limit;
+                const loadingThis = isBooking === doc.id;
+                
                 return (
                   <Button
                     key={doc.id}
                     variant="outline"
-                    disabled={isFull}
+                    disabled={isFull || !!isBooking}
                     onClick={() => selectDoctor(doc)}
                     className={`h-auto flex flex-col items-start p-4 text-left border-2 hover:border-primary transition-all relative ${isFull ? 'opacity-50 grayscale' : 'hover:bg-primary/5 shadow-sm'}`}
                   >
+                    {loadingThis && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-md z-10">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      </div>
+                    )}
                     <div className="flex justify-between w-full mb-1">
                       <h3 className="text-xl font-bold text-foreground">{doc.name}</h3>
                       <span className="text-primary font-bold bg-primary/10 px-2 py-0.5 rounded text-xs">{doc.specialty}</span>
@@ -413,7 +428,7 @@ export function KioskController() {
                     <p className="text-muted-foreground text-sm mb-2">{doc.time}</p>
                     <div className="flex items-center justify-between w-full mt-auto">
                       <span className="text-xs font-semibold">
-                        {t.tokensBooked}: <span className={isFull ? 'text-destructive' : 'text-primary'}>{doc.booked} / {doc.limit}</span>
+                        {t.tokensBooked}: <span className={isFull ? 'text-destructive' : 'text-primary'}>{doc.booked || 0} / {doc.limit}</span>
                       </span>
                       {isFull && <span className="text-destructive font-black uppercase text-sm">{t.fullyBooked}</span>}
                     </div>

@@ -39,5 +39,5 @@
       "description": "Collection of current token counts per doctor."
     }
   },
-  "_trigger_rules_update": "v2"
+  "_trigger_rules_update": "v3"
 }
