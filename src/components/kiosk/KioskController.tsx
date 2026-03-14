@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { Header } from "./Header";
 import { TRANSLATIONS, MOCK_DOCTORS } from "@/lib/constants";
-import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
+import type { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
@@ -40,7 +39,6 @@ export function KioskController() {
   const [timer, setTimer] = useState(30); 
   const [showReceipt, setShowReceipt] = useState(false);
   
-  // Local state for live doctor counts
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
   const db = useFirestore();
@@ -52,26 +50,22 @@ export function KioskController() {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Auto-sign in for Firestore permissions
   useEffect(() => {
     if (auth && !user) {
       signInAnonymously(auth).catch((err) => {
-        // Silently handle auth errors
+        console.error("Auth error:", err);
       });
     }
   }, [auth, user]);
 
-  // Randomize initial counts on client-side mount only
   useEffect(() => {
     const randomized = MOCK_DOCTORS.map(doc => ({
       ...doc,
-      // Randomly fill between 0 and 70% of the doctor's limit
       booked: Math.floor(Math.random() * (doc.limit * 0.7))
     }));
     setLiveDoctors(randomized);
   }, []);
 
-  // Reset timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === 'CONFIRMATION' && !showReceipt) {

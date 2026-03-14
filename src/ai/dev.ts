@@ -1,4 +1,4 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/malayalam-voice-input.ts';
+import './flows/malayalam-voice-input.ts';
