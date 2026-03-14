@@ -62,6 +62,7 @@ export function KioskController() {
     }
   }, [auth, user]);
 
+  // Randomize initial counts on mount
   useEffect(() => {
     const randomized = MOCK_DOCTORS.map(doc => ({
       ...doc,
@@ -146,7 +147,7 @@ export function KioskController() {
         }
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-        if (audioBlob.size < 1000) { // Too small to be real speech
+        if (audioBlob.size < 1000) { 
           setIsProcessing(false);
           return;
         }
@@ -180,7 +181,6 @@ export function KioskController() {
       recorder.start();
       setIsRecording(true);
 
-      // Auto-stop after 10 seconds to protect payload limits
       recordingTimeoutRef.current = setTimeout(() => {
         stopRecording();
       }, 10000);
