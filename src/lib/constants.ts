@@ -42,6 +42,7 @@ export const TRANSLATIONS = {
   }
 };
 
+// Doctors start with 0 bookings as requested, or small random numbers to look "live"
 export const MOCK_DOCTORS: Doctor[] = [
   { id: '1', name: 'Dr. Rahul Sharma', specialty: 'General Physician', time: '09:00 AM - 01:00 PM', booked: 0, limit: 20 },
   { id: '2', name: 'Dr. Priya Nair', specialty: 'Pediatrician', time: '10:00 AM - 02:00 PM', booked: 0, limit: 20 },
