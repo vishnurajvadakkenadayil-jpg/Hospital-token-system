@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -369,18 +370,19 @@ export function KioskController() {
 
       case 'CONFIRMATION':
         return (
-          <div className="flex flex-col items-center justify-center gap-8 h-full py-10 animate-in fade-in zoom-in duration-500">
-             <div className="bg-white border-8 border-green-500 rounded-full p-6 shadow-2xl">
-               <Check className="w-20 h-20 text-green-500" />
-             </div>
+          <div className="flex flex-col items-center gap-8 h-full py-10 animate-in fade-in zoom-in duration-500 max-w-4xl mx-auto w-full">
              <div className="text-center space-y-2">
-               <h2 className="text-3xl font-bold text-muted-foreground">{t.tokenMessage}</h2>
-               <div className="text-[10rem] font-black leading-none text-primary drop-shadow-lg">
-                 {patientData.tokenNumber}
-               </div>
-               <p className="text-2xl font-medium text-foreground max-w-xl mx-auto">
-                 {t.waitMessage}
+               <h2 className="text-3xl font-bold text-green-600 flex items-center justify-center gap-2">
+                 <Check className="w-10 h-10" /> Booking Successful!
+               </h2>
+               <p className="text-xl font-medium text-muted-foreground">
+                 Review your token below and click Print.
                </p>
+             </div>
+             
+             {/* VISUAL RECEIPT PREVIEW */}
+             <div className="bg-white p-8 shadow-2xl border-2 border-primary/20 rounded-xl transform scale-110 mb-8 overflow-hidden w-[80mm] max-w-full">
+                <ReceiptTemplate data={patientData} isPreview={true} />
              </div>
              
              <div className="flex flex-col gap-4 w-full max-w-md">
@@ -414,6 +416,7 @@ export function KioskController() {
       <main className="flex-1 overflow-y-auto px-4 no-print flex flex-col items-center">
         {renderContent()}
       </main>
+      {/* Real print-only version used by window.print() */}
       <ReceiptTemplate data={patientData} />
     </div>
   );
