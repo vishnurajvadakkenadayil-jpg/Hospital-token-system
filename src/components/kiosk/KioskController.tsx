@@ -32,7 +32,8 @@ export function KioskController() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooking, setIsBooking] = useState<string | null>(null);
   const [tempVoiceText, setTempVoiceText] = useState("");
-  const [timer, setTimer] = useState(30); 
+  const [timer, setTimer] = useState(60); 
+  const [showReceipt, setShowReceipt] = useState(false);
   
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
 
@@ -58,7 +59,7 @@ export function KioskController() {
         setTimer((prev) => {
           if (prev <= 1) {
             resetKiosk();
-            return 30;
+            return 60;
           }
           return prev - 1;
         });
@@ -71,8 +72,9 @@ export function KioskController() {
     setStep('LANGUAGE');
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
-    setTimer(30);
+    setTimer(60);
     setIsBooking(null);
+    setShowReceipt(false);
     stopRecording();
   };
 
@@ -168,7 +170,11 @@ export function KioskController() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowReceipt(true);
+    // Tiny delay to allow state to update visually before browser print blocks thread
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const selectDoctor = (doctor: Doctor) => {
@@ -371,36 +377,50 @@ export function KioskController() {
       case 'CONFIRMATION':
         return (
           <div className="flex flex-col items-center gap-8 h-full py-10 animate-in fade-in zoom-in duration-500 max-w-4xl mx-auto w-full">
-             <div className="text-center space-y-2">
-               <h2 className="text-3xl font-bold text-green-600 flex items-center justify-center gap-2">
-                 <Check className="w-10 h-10" /> Booking Successful!
+             <div className="text-center space-y-4">
+               <h2 className="text-4xl font-bold text-green-600 flex items-center justify-center gap-3">
+                 <Check className="w-12 h-12" /> Booking Successful!
                </h2>
-               <p className="text-xl font-medium text-muted-foreground">
-                 Review your token below and click Print.
+               <p className="text-2xl font-medium text-muted-foreground">
+                 Please click the button below to issue your paper receipt.
                </p>
              </div>
              
-             {/* VISUAL RECEIPT PREVIEW */}
-             <div className="bg-white p-8 shadow-2xl border-2 border-primary/20 rounded-xl transform scale-110 mb-8 overflow-hidden w-[80mm] max-w-full">
-                <ReceiptTemplate data={patientData} isPreview={true} />
-             </div>
+             {/* VISUAL RECEIPT PREVIEW - Only shown after clicking Print */}
+             {showReceipt && (
+               <div className="bg-white p-8 shadow-2xl border-2 border-primary/20 rounded-xl transform scale-110 mb-8 overflow-hidden w-[80mm] max-w-full animate-in slide-in-from-bottom duration-500">
+                  <ReceiptTemplate data={patientData} isPreview={true} />
+               </div>
+             )}
              
              <div className="flex flex-col gap-4 w-full max-w-md">
-               <Button 
-                onClick={handlePrint} 
-                size="lg" 
-                className="h-24 px-8 text-3xl font-black bg-green-600 hover:bg-green-700 shadow-xl flex gap-4 uppercase"
-               >
-                 <Printer className="w-10 h-10" /> {lang === 'en' ? 'Print Receipt' : 'റസീപ്റ്റ് പ്രിന്റ് ചെയ്യുക'}
-               </Button>
+               {!showReceipt ? (
+                 <Button 
+                  onClick={handlePrint} 
+                  size="lg" 
+                  className="h-32 px-8 text-4xl font-black bg-primary hover:bg-primary/90 shadow-xl flex gap-4 uppercase rounded-3xl"
+                 >
+                   <Printer className="w-12 h-12" /> {lang === 'en' ? 'Print Receipt' : 'റസീപ്റ്റ് പ്രിന്റ് ചെയ്യുക'}
+                 </Button>
+               ) : (
+                 <Button 
+                  onClick={resetKiosk} 
+                  size="lg" 
+                  className="h-24 px-8 text-3xl font-black bg-green-600 hover:bg-green-700 shadow-xl flex gap-4 uppercase rounded-3xl"
+                 >
+                   Done / ശരി
+                 </Button>
+               )}
                
-               <Button onClick={resetKiosk} variant="ghost" className="h-14 text-xl font-bold text-muted-foreground">
-                 Done / ശരി
-               </Button>
+               {!showReceipt && (
+                 <Button onClick={resetKiosk} variant="ghost" className="h-14 text-xl font-bold text-muted-foreground">
+                   Skip / വേണ്ട
+                 </Button>
+               )}
              </div>
 
              <div className="mt-4 text-muted-foreground font-bold">
-               Restarting in {timer} seconds...
+               {showReceipt ? `Finish or wait ${timer}s to reset` : `Resetting in ${timer}s`}
              </div>
           </div>
         );
