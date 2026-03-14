@@ -8,7 +8,7 @@ import { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
-import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer } from "lucide-react";
+import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer, X } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
 import { 
@@ -18,6 +18,13 @@ import {
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { useFirestore, useAuth, useUser } from "@/firebase";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
@@ -171,10 +178,10 @@ export function KioskController() {
 
   const handlePrint = () => {
     setShowReceipt(true);
-    // Tiny delay to allow state to update visually before browser print blocks thread
+    // Tiny delay to allow the modal to render before browser print dialog blocks the main thread
     setTimeout(() => {
       window.print();
-    }, 100);
+    }, 500);
   };
 
   const selectDoctor = (doctor: Doctor) => {
@@ -382,46 +389,41 @@ export function KioskController() {
                  <Check className="w-12 h-12" /> Booking Successful!
                </h2>
                <p className="text-2xl font-medium text-muted-foreground">
-                 Please click the button below to issue your paper receipt.
+                 Click the button below to issue your paper receipt.
                </p>
              </div>
              
-             {/* VISUAL RECEIPT PREVIEW - Only shown after clicking Print */}
-             {showReceipt && (
-               <div className="bg-white p-8 shadow-2xl border-2 border-primary/20 rounded-xl transform scale-110 mb-8 overflow-hidden w-[80mm] max-w-full animate-in slide-in-from-bottom duration-500">
-                  <ReceiptTemplate data={patientData} isPreview={true} />
-               </div>
-             )}
-             
              <div className="flex flex-col gap-4 w-full max-w-md">
-               {!showReceipt ? (
-                 <Button 
-                  onClick={handlePrint} 
-                  size="lg" 
-                  className="h-32 px-8 text-4xl font-black bg-primary hover:bg-primary/90 shadow-xl flex gap-4 uppercase rounded-3xl"
-                 >
-                   <Printer className="w-12 h-12" /> {lang === 'en' ? 'Print Receipt' : 'റസീപ്റ്റ് പ്രിന്റ് ചെയ്യുക'}
-                 </Button>
-               ) : (
-                 <Button 
-                  onClick={resetKiosk} 
-                  size="lg" 
-                  className="h-24 px-8 text-3xl font-black bg-green-600 hover:bg-green-700 shadow-xl flex gap-4 uppercase rounded-3xl"
-                 >
-                   Done / ശരി
-                 </Button>
-               )}
+               <Button 
+                onClick={handlePrint} 
+                size="lg" 
+                className="h-32 px-8 text-4xl font-black bg-primary hover:bg-primary/90 shadow-xl flex gap-4 uppercase rounded-3xl"
+               >
+                 <Printer className="w-12 h-12" /> {lang === 'en' ? 'Print Receipt' : 'റസീപ്റ്റ് പ്രിന്റ് ചെയ്യുക'}
+               </Button>
                
-               {!showReceipt && (
-                 <Button onClick={resetKiosk} variant="ghost" className="h-14 text-xl font-bold text-muted-foreground">
-                   Skip / വേണ്ട
-                 </Button>
-               )}
+               <Button onClick={resetKiosk} variant="ghost" className="h-14 text-xl font-bold text-muted-foreground">
+                 Skip & Finish
+               </Button>
              </div>
 
              <div className="mt-4 text-muted-foreground font-bold">
-               {showReceipt ? `Finish or wait ${timer}s to reset` : `Resetting in ${timer}s`}
+               {`Resetting in ${timer}s`}
              </div>
+
+             <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+               <DialogContent className="max-w-[90mm] p-0 border-none bg-transparent shadow-none">
+                 <div className="bg-white p-4 shadow-2xl rounded-xl w-full flex flex-col items-center">
+                    <ReceiptTemplate data={patientData} isPreview={true} />
+                    <Button 
+                      onClick={resetKiosk} 
+                      className="mt-6 w-full h-16 text-2xl font-bold bg-green-600 hover:bg-green-700 no-print"
+                    >
+                      Done / ശരി
+                    </Button>
+                 </div>
+               </DialogContent>
+             </Dialog>
           </div>
         );
 
