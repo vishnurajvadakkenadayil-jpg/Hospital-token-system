@@ -5,10 +5,9 @@ import { Header } from "./Header";
 import { TRANSLATIONS, MOCK_DOCTORS } from "@/lib/constants";
 import type { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
 import { FullKeyboard } from "./FullKeyboard";
-import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer, X } from "lucide-react";
+import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer, X, AlertCircle } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
 import { 
@@ -23,6 +22,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
@@ -39,17 +39,20 @@ export function KioskController() {
   const [tempVoiceText, setTempVoiceText] = useState("");
   const [timer, setTimer] = useState(30); 
   const [showReceipt, setShowReceipt] = useState(false);
+  const [recordingError, setRecordingError] = useState(false);
   
   const [liveDoctors, setLiveDoctors] = useState<Doctor[]>([]);
 
   const db = useFirestore();
   const auth = useAuth();
   const { user } = useUser();
+  const { toast } = useToast();
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (auth && !user) {
@@ -60,7 +63,6 @@ export function KioskController() {
   }, [auth, user]);
 
   useEffect(() => {
-    // Randomize initial counts for clinical realism
     const randomized = MOCK_DOCTORS.map(doc => ({
       ...doc,
       booked: Math.floor(Math.random() * (doc.limit * 0.6))
@@ -91,6 +93,7 @@ export function KioskController() {
     setTimer(30);
     setIsBooking(null);
     setShowReceipt(false);
+    setRecordingError(false);
     stopRecording();
   };
 
@@ -101,6 +104,7 @@ export function KioskController() {
     else if (step === 'HEALTH_ISSUE') setStep('PLACE');
     else if (step === 'DOCTOR_SELECT') setStep('HEALTH_ISSUE');
     setTempVoiceText("");
+    setRecordingError(false);
   };
 
   const handleLangSelect = (l: Language) => {
@@ -113,12 +117,19 @@ export function KioskController() {
   };
 
   const startRecording = async () => {
+    setRecordingError(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true, 
+          autoGainControl: true 
+        } 
+      });
       streamRef.current = stream;
       
-      const formats = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
-      const mimeType = formats.find(f => MediaRecorder.isTypeSupported(f)) || 'audio/webm';
+      const formats = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/aac'];
+      const mimeType = formats.find(f => MediaRecorder.isTypeSupported(f)) || '';
         
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -135,6 +146,11 @@ export function KioskController() {
         }
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+        if (audioBlob.size < 1000) { // Too small to be real speech
+          setIsProcessing(false);
+          return;
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -144,9 +160,12 @@ export function KioskController() {
             const result = await malayalamSpeechToText({ audioDataUri: base64Audio });
             if (result && result.recognizedText) {
               setTempVoiceText(result.recognizedText);
+            } else {
+              setRecordingError(true);
             }
           } catch (err) {
             console.error("Transcription error:", err);
+            setRecordingError(true);
           } finally {
             setIsProcessing(false);
           }
@@ -160,12 +179,26 @@ export function KioskController() {
 
       recorder.start();
       setIsRecording(true);
+
+      // Auto-stop after 10 seconds to protect payload limits
+      recordingTimeoutRef.current = setTimeout(() => {
+        stopRecording();
+      }, 10000);
+
     } catch (err) {
       console.error("Mic access error", err);
+      toast({
+        variant: "destructive",
+        title: "Microphone Error",
+        description: "Could not access the microphone. Please check permissions.",
+      });
     }
   };
 
   const stopRecording = () => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -274,6 +307,7 @@ export function KioskController() {
             ) : (
               <div className="w-full flex flex-col items-center gap-8 max-w-2xl mx-auto mt-10">
                 <h2 className="text-4xl font-bold text-center">{t[field as keyof typeof t]}</h2>
+                
                 {isProcessing ? (
                   <div className="flex flex-col items-center gap-6 p-10 bg-white rounded-3xl border-4 border-dashed border-primary animate-pulse">
                     <Loader2 className="h-20 w-20 text-primary animate-spin" />
@@ -296,7 +330,7 @@ export function KioskController() {
                 ) : (
                   <div className="flex flex-col items-center gap-10">
                     <Button 
-                      className={`w-64 h-64 rounded-full shadow-2xl transition-all active:scale-90 ${isRecording ? 'bg-red-500 scale-110 ring-8 ring-red-200' : 'bg-primary hover:bg-primary/90'}`}
+                      className={`w-64 h-64 rounded-full shadow-2xl transition-all active:scale-90 ${isRecording ? 'bg-red-500 scale-110 ring-[12px] ring-red-200' : 'bg-primary hover:bg-primary/90'}`}
                       onMouseDown={startRecording}
                       onMouseUp={stopRecording}
                       onTouchStart={startRecording}
@@ -304,11 +338,22 @@ export function KioskController() {
                     >
                       <Mic className={`w-32 h-32 text-white ${isRecording ? 'animate-pulse' : ''}`} />
                     </Button>
-                    <div className="text-center space-y-2">
-                      <p className="text-3xl font-black text-foreground">
+                    <div className="text-center space-y-4">
+                      <p className={`text-4xl font-black transition-colors ${isRecording ? 'text-red-600' : 'text-foreground'}`}>
                         {isRecording ? (lang === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...') : t.tapToSpeak}
                       </p>
-                      {!isRecording && <p className="text-xl text-muted-foreground font-bold">(Hold to talk)</p>}
+                      {!isRecording && (
+                        <p className="text-xl text-muted-foreground font-bold flex flex-col gap-1">
+                          <span>(Hold button while talking)</span>
+                          <span className="text-sm opacity-60">ബട്ടൺ അമർത്തിപ്പിടിച്ച് സംസാരിക്കുക</span>
+                        </p>
+                      )}
+                      {recordingError && (
+                        <div className="bg-destructive/10 text-destructive p-4 rounded-xl flex items-center gap-3 animate-bounce">
+                          <AlertCircle className="w-8 h-8" />
+                          <span className="text-xl font-bold">{t.errorVoice}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
