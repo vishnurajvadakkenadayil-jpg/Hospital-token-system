@@ -36,7 +36,7 @@ export function KioskController() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooking, setIsBooking] = useState<string | null>(null);
   const [tempVoiceText, setTempVoiceText] = useState("");
-  const [timer, setTimer] = useState(60); 
+  const [timer, setTimer] = useState(30); 
   const [showReceipt, setShowReceipt] = useState(false);
   
   // Local state for live doctor counts
@@ -55,7 +55,7 @@ export function KioskController() {
   useEffect(() => {
     if (auth && !user) {
       signInAnonymously(auth).catch((err) => {
-        console.error("Auth error:", err);
+        // Silently handle auth errors
       });
     }
   }, [auth, user]);
@@ -78,7 +78,7 @@ export function KioskController() {
         setTimer((prev) => {
           if (prev <= 1) {
             resetKiosk();
-            return 60;
+            return 30;
           }
           return prev - 1;
         });
@@ -91,7 +91,7 @@ export function KioskController() {
     setStep('LANGUAGE');
     setPatientData({ name: '', mobile: '', place: '', healthIssue: '' });
     setTempVoiceText("");
-    setTimer(60);
+    setTimer(30);
     setIsBooking(null);
     setShowReceipt(false);
     stopRecording();
@@ -190,7 +190,6 @@ export function KioskController() {
 
   const handlePrintClick = () => {
     setShowReceipt(true);
-    // Auto-trigger print after short delay to allow dialog rendering
     setTimeout(() => {
       window.print();
     }, 700);
@@ -200,7 +199,6 @@ export function KioskController() {
     setIsBooking(doctor.id);
     const newTokenNumber = (doctor.booked || 0) + 1;
 
-    // Update local UI immediately
     setLiveDoctors(prev => prev.map(d => 
       d.id === doctor.id ? { ...d, booked: newTokenNumber } : d
     ));
@@ -214,7 +212,6 @@ export function KioskController() {
     };
     setPatientData(finalPatientData);
 
-    // Save record to database
     if (db) {
       addDoc(collection(db, "tokens"), {
         ...finalPatientData,
@@ -427,7 +424,6 @@ export function KioskController() {
                </div>
              )}
 
-             {/* A4 Prescription Popup Dialog */}
              <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
                <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[90vh] p-0 border-none bg-white overflow-hidden shadow-2xl rounded-2xl">
                  <div className="flex flex-col h-full bg-gray-100">
@@ -476,7 +472,6 @@ export function KioskController() {
       <main className="flex-1 overflow-y-auto px-4 no-print flex flex-col items-center">
         {renderContent()}
       </main>
-      {/* Real print-only version used by browser for A4 paper */}
       <ReceiptTemplate data={patientData} />
     </div>
   );
