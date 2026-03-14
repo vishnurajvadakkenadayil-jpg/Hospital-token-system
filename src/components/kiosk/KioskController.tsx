@@ -7,6 +7,7 @@ import type { Language, KioskStep, PatientData, Doctor } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Numpad } from "./Numpad";
+import { FullKeyboard } from "./FullKeyboard";
 import { Mic, Check, RotateCcw, ArrowRight, ArrowLeft, Loader2, Printer, X } from "lucide-react";
 import { malayalamSpeechToText } from "@/ai/flows/malayalam-voice-input";
 import { ReceiptTemplate } from "./ReceiptTemplate";
@@ -39,7 +40,7 @@ export function KioskController() {
   const [timer, setTimer] = useState(30); 
   const [showReceipt, setShowReceipt] = useState(false);
   
-  const [liveDoctors, setLiveDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
+  const [liveDoctors, setLiveDoctors] = useState<Doctor[]>([]);
 
   const db = useFirestore();
   const auth = useAuth();
@@ -59,9 +60,10 @@ export function KioskController() {
   }, [auth, user]);
 
   useEffect(() => {
+    // Randomize initial counts for clinical realism
     const randomized = MOCK_DOCTORS.map(doc => ({
       ...doc,
-      booked: Math.floor(Math.random() * (doc.limit * 0.7))
+      booked: Math.floor(Math.random() * (doc.limit * 0.6))
     }));
     setLiveDoctors(randomized);
   }, []);
@@ -253,34 +255,25 @@ export function KioskController() {
         const currentVal = patientData[field];
 
         return (
-          <div className="flex flex-col items-center gap-6 max-w-2xl mx-auto py-6 w-full h-full">
-             <div className="w-full flex justify-start">
+          <div className="flex flex-col items-center gap-4 w-full h-full py-4">
+             <div className="w-full flex justify-start max-w-4xl px-4">
                <Button variant="ghost" className="text-xl font-bold gap-2" onClick={goBack}>
                  <ArrowLeft /> {lang === 'en' ? 'Back' : 'തിരികെ'}
                </Button>
              </div>
              
-            <h2 className="text-4xl font-bold text-center">{t[field as keyof typeof t]}</h2>
-            
             {lang === 'en' ? (
-              <div className="w-full flex flex-col gap-6">
-                <Input 
-                  autoFocus
-                  className="h-20 text-3xl px-6 text-center border-4"
+              <div className="w-full h-full flex flex-col items-center justify-center">
+                <FullKeyboard 
+                  label={t[field as keyof typeof t]}
                   value={String(currentVal)}
-                  onChange={(e) => updateData(field, e.target.value)}
-                  placeholder="..."
+                  onChange={(val) => updateData(field, val)}
+                  onConfirm={() => moveToNextStep(field)}
                 />
-                <Button 
-                  className="h-20 text-2xl font-bold" 
-                  disabled={!currentVal}
-                  onClick={() => moveToNextStep(field)}
-                >
-                  {t.next} <ArrowRight className="ml-2 w-8 h-8" />
-                </Button>
               </div>
             ) : (
-              <div className="w-full flex flex-col items-center gap-8">
+              <div className="w-full flex flex-col items-center gap-8 max-w-2xl mx-auto mt-10">
+                <h2 className="text-4xl font-bold text-center">{t[field as keyof typeof t]}</h2>
                 {isProcessing ? (
                   <div className="flex flex-col items-center gap-6 p-10 bg-white rounded-3xl border-4 border-dashed border-primary animate-pulse">
                     <Loader2 className="h-20 w-20 text-primary animate-spin" />
