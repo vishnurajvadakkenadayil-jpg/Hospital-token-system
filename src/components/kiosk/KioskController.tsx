@@ -25,6 +25,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function KioskController() {
   const [step, setStep] = useState<KioskStep>('LANGUAGE');
@@ -61,7 +62,7 @@ export function KioskController() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (step === 'CONFIRMATION') {
+    if (step === 'CONFIRMATION' && !showReceipt) {
       interval = setInterval(() => {
         setTimer((prev) => {
           if (prev <= 1) {
@@ -73,7 +74,7 @@ export function KioskController() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, showReceipt]);
 
   const resetKiosk = () => {
     setStep('LANGUAGE');
@@ -178,7 +179,6 @@ export function KioskController() {
 
   const handlePrint = () => {
     setShowReceipt(true);
-    // Tiny delay to allow the modal to render before browser print dialog blocks the main thread
     setTimeout(() => {
       window.print();
     }, 500);
@@ -389,7 +389,7 @@ export function KioskController() {
                  <Check className="w-12 h-12" /> Booking Successful!
                </h2>
                <p className="text-2xl font-medium text-muted-foreground">
-                 Click the button below to issue your paper receipt.
+                 Click the button below to issue your prescription/token.
                </p>
              </div>
              
@@ -407,20 +407,41 @@ export function KioskController() {
                </Button>
              </div>
 
-             <div className="mt-4 text-muted-foreground font-bold">
-               {`Resetting in ${timer}s`}
-             </div>
+             {!showReceipt && (
+               <div className="mt-4 text-muted-foreground font-bold">
+                 {`Resetting in ${timer}s`}
+               </div>
+             )}
 
              <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-               <DialogContent className="max-w-[90mm] p-0 border-none bg-transparent shadow-none">
-                 <div className="bg-white p-4 shadow-2xl rounded-xl w-full flex flex-col items-center">
-                    <ReceiptTemplate data={patientData} isPreview={true} />
-                    <Button 
-                      onClick={resetKiosk} 
-                      className="mt-6 w-full h-16 text-2xl font-bold bg-green-600 hover:bg-green-700 no-print"
-                    >
-                      Done / ശരി
-                    </Button>
+               <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[90vh] p-0 border-none bg-white overflow-hidden shadow-2xl rounded-2xl">
+                 <div className="flex flex-col h-full bg-gray-100">
+                    <div className="bg-white border-b p-4 flex justify-between items-center no-print">
+                      <h3 className="text-xl font-bold">Prescription Preview</h3>
+                      <Button variant="ghost" size="icon" onClick={() => setShowReceipt(false)}>
+                        <X className="w-6 h-6" />
+                      </Button>
+                    </div>
+                    <ScrollArea className="flex-1 p-4 md:p-10">
+                      <div className="max-w-[210mm] mx-auto bg-white shadow-lg">
+                        <ReceiptTemplate data={patientData} isPreview={true} />
+                      </div>
+                    </ScrollArea>
+                    <div className="bg-white border-t p-6 flex gap-4 no-print">
+                      <Button 
+                        onClick={() => window.print()}
+                        variant="outline"
+                        className="flex-1 h-16 text-xl font-bold border-2"
+                      >
+                        <Printer className="mr-2" /> Re-Print
+                      </Button>
+                      <Button 
+                        onClick={resetKiosk} 
+                        className="flex-1 h-16 text-2xl font-bold bg-green-600 hover:bg-green-700"
+                      >
+                        Done / ശരി
+                      </Button>
+                    </div>
                  </div>
                </DialogContent>
              </Dialog>
