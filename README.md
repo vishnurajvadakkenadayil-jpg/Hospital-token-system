@@ -1,4 +1,4 @@
-# Hospital Token-Reciept Syestem
+# Hospital Token-Reciept System
 
 Many hospitals and clinics face the challenge of managing large numbers of patients waiting to register and receive consultation tokens. Manual token systems and reception counters often lead to long queues, delays, and inefficient patient flow, especially as the number of patients increases.
 
